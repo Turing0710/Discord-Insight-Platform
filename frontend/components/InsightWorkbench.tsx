@@ -15,7 +15,8 @@ import {
 } from "../lib/api";
 import { Locale, t } from "../lib/i18n";
 
-const QUICK_KEYWORDS = ["bug", "lag", "event", "Roblox", "crash", "login", "disconnect"];
+const DEFAULT_QUICK_KEYWORDS = ["bug", "lag", "event", "Roblox", "crash", "login", "disconnect"];
+const QUICK_KEYWORDS_STORAGE_KEY = "discord-insight.quickKeywords";
 const MAX_TABLE_ROWS = 1000;
 const MAX_PROMPT_MESSAGES = 300;
 const CHATGPT_URL = "https://chatgpt.com/";
@@ -49,6 +50,10 @@ function formatDateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function normalizeQuickKeyword(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
 }
 
 function buildChatGptPrompt(input: {
@@ -148,6 +153,9 @@ export default function InsightWorkbench({ locale }: InsightWorkbenchProps) {
   const [renameFileName, setRenameFileName] = useState("");
   const [isManageOpen, setIsManageOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [quickKeywords, setQuickKeywords] = useState(DEFAULT_QUICK_KEYWORDS);
+  const [isAddingQuickKeyword, setIsAddingQuickKeyword] = useState(false);
+  const [newQuickKeyword, setNewQuickKeyword] = useState("");
   const [authorFilter, setAuthorFilter] = useState("");
   const [packedJson, setPackedJson] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
@@ -193,6 +201,37 @@ export default function InsightWorkbench({ locale }: InsightWorkbenchProps) {
   useEffect(() => {
     void refreshFiles();
   }, []);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(QUICK_KEYWORDS_STORAGE_KEY);
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return;
+
+      const cleaned = parsed
+        .map((item) => normalizeQuickKeyword(String(item)))
+        .filter(Boolean)
+        .filter((item, index, array) =>
+          array.findIndex((candidate) => candidate.toLowerCase() === item.toLowerCase()) === index
+        );
+
+      if (cleaned.length > 0) {
+        setQuickKeywords(cleaned);
+      }
+    } catch {
+      setQuickKeywords(DEFAULT_QUICK_KEYWORDS);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(QUICK_KEYWORDS_STORAGE_KEY, JSON.stringify(quickKeywords));
+    } catch {
+      // Ignore storage failures; keyword editing should still work for this session.
+    }
+  }, [quickKeywords]);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -248,6 +287,26 @@ export default function InsightWorkbench({ locale }: InsightWorkbenchProps) {
 
   function handleQuickKeyword(value: string) {
     setKeyword((prev) => (prev.toLowerCase() === value.toLowerCase() ? "" : value));
+  }
+
+  function addQuickKeyword() {
+    const normalized = normalizeQuickKeyword(newQuickKeyword);
+    if (!normalized) return;
+
+    setQuickKeywords((prev) => {
+      if (prev.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+        return prev;
+      }
+      return [...prev, normalized];
+    });
+    setKeyword(normalized);
+    setNewQuickKeyword("");
+    setIsAddingQuickKeyword(false);
+  }
+
+  function removeQuickKeyword(value: string) {
+    setQuickKeywords((prev) => prev.filter((item) => item.toLowerCase() !== value.toLowerCase()));
+    setKeyword((prev) => (prev.toLowerCase() === value.toLowerCase() ? "" : prev));
   }
 
   function handleScrapeSuccess(result: ScrapeResult) {
@@ -643,24 +702,76 @@ export default function InsightWorkbench({ locale }: InsightWorkbenchProps) {
           </label>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {QUICK_KEYWORDS.map((item) => {
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {quickKeywords.map((item) => {
             const active = keyword.toLowerCase() === item.toLowerCase();
             return (
-              <button
-                key={item}
-                type="button"
-                onClick={() => handleQuickKeyword(item)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                  active
-                    ? "border-sky-400 bg-sky-100 text-sky-800"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {item}
-              </button>
+              <span key={item} className="group relative inline-flex">
+                <button
+                  type="button"
+                  onClick={() => handleQuickKeyword(item)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    active
+                      ? "border-sky-400 bg-sky-100 text-sky-800"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {item}
+                </button>
+                <button
+                  type="button"
+                  aria-label={t(locale, "phase2.keyword.delete")}
+                  title={t(locale, "phase2.keyword.delete")}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    removeQuickKeyword(item);
+                  }}
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-[10px] font-bold leading-none text-rose-600 opacity-0 shadow-sm transition hover:bg-rose-100 group-hover:opacity-100 group-focus-within:opacity-100"
+                >
+                  x
+                </button>
+              </span>
             );
           })}
+
+          {isAddingQuickKeyword ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-2 py-1 shadow-sm">
+              <input
+                value={newQuickKeyword}
+                onChange={(event) => setNewQuickKeyword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addQuickKeyword();
+                  }
+                  if (event.key === "Escape") {
+                    setNewQuickKeyword("");
+                    setIsAddingQuickKeyword(false);
+                  }
+                }}
+                placeholder={t(locale, "phase2.keyword.customPlaceholder")}
+                autoFocus
+                className="w-28 rounded-full border-0 bg-transparent px-1 py-0.5 text-xs text-slate-700 outline-none focus:ring-0"
+              />
+              <button
+                type="button"
+                onClick={addQuickKeyword}
+                className="rounded-full bg-sky-600 px-2 py-0.5 text-[11px] font-medium text-white transition hover:bg-sky-700"
+              >
+                {t(locale, "phase2.keyword.add")}
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              aria-label={t(locale, "phase2.keyword.addCustom")}
+              title={t(locale, "phase2.keyword.addCustom")}
+              onClick={() => setIsAddingQuickKeyword(true)}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-base font-semibold leading-none text-slate-500 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+            >
+              +
+            </button>
+          )}
         </div>
 
         <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
