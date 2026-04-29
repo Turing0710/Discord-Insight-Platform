@@ -34,6 +34,8 @@ class BrowserCommandError(Exception):
 
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
+DISCORD_PERMISSION_ADMINISTRATOR = 1 << 3
+DISCORD_PERMISSION_VIEW_CHANNEL = 1 << 10
 
 
 def fetch_guilds(discord_token: str, settings: Settings) -> list[DiscordGuildItem]:
@@ -231,6 +233,12 @@ def _fetch_channels_from_discord_api(
     if not isinstance(raw_items, list):
         raise BrowserCommandError("Discord API returned an invalid channel list.")
 
+    visible_channel_ids = _resolve_visible_channel_ids(
+        discord_token=discord_token,
+        guild_id=guild_id,
+        raw_channels=raw_items,
+    )
+
     channels: list[DiscordChannelItem] = []
     for item in raw_items:
         if not isinstance(item, dict):
@@ -238,6 +246,8 @@ def _fetch_channels_from_discord_api(
         channel_id = str(item.get("id") or "").strip()
         name = str(item.get("name") or "").strip()
         if not channel_id or not name:
+            continue
+        if visible_channel_ids is not None and channel_id not in visible_channel_ids:
             continue
         parent_id = item.get("parent_id")
         position = item.get("position")
@@ -255,6 +265,152 @@ def _fetch_channels_from_discord_api(
     # Discord returns channels in display order in practice; this keeps that order stable
     # and still handles API clients that return looser ordering.
     return sorted(channels, key=lambda item: (item.position if item.position is not None else 999999))
+
+
+def _resolve_visible_channel_ids(
+    discord_token: str, guild_id: str, raw_channels: list
+) -> set[str] | None:
+    try:
+        raw_user = _discord_api_request(discord_token, "/users/@me")
+        raw_member = _discord_api_request(discord_token, f"/users/@me/guilds/{guild_id}/member")
+        raw_roles = _discord_api_request(discord_token, f"/guilds/{guild_id}/roles")
+    except BrowserMissingTokenError:
+        raise
+    except (BrowserInvalidTokenError, BrowserCommandError):
+        return None
+
+    if not isinstance(raw_user, dict) or not isinstance(raw_member, dict) or not isinstance(raw_roles, list):
+        return None
+
+    user_id = str(raw_user.get("id") or "").strip()
+    member_role_ids = {
+        str(role_id)
+        for role_id in raw_member.get("roles", [])
+        if str(role_id).strip()
+    }
+    if not user_id:
+        return None
+
+    role_permissions: dict[str, int] = {}
+    for role in raw_roles:
+        if not isinstance(role, dict):
+            continue
+        role_id = str(role.get("id") or "").strip()
+        if not role_id:
+            continue
+        role_permissions[role_id] = _parse_permission_value(role.get("permissions"))
+
+    base_permissions = role_permissions.get(guild_id, 0)
+    for role_id in member_role_ids:
+        base_permissions |= role_permissions.get(role_id, 0)
+
+    if base_permissions & DISCORD_PERMISSION_ADMINISTRATOR:
+        return {
+            str(item.get("id"))
+            for item in raw_channels
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+
+    channel_by_id = {
+        str(item.get("id")): item
+        for item in raw_channels
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    }
+
+    visible_ids: set[str] = set()
+    for channel_id, channel in channel_by_id.items():
+        permissions = _compute_channel_permissions(
+            base_permissions=base_permissions,
+            channel=channel,
+            channel_by_id=channel_by_id,
+            guild_id=guild_id,
+            user_id=user_id,
+            member_role_ids=member_role_ids,
+        )
+        if permissions & DISCORD_PERMISSION_VIEW_CHANNEL:
+            visible_ids.add(channel_id)
+
+    return visible_ids
+
+
+def _compute_channel_permissions(
+    base_permissions: int,
+    channel: dict,
+    channel_by_id: dict[str, dict],
+    guild_id: str,
+    user_id: str,
+    member_role_ids: set[str],
+) -> int:
+    permissions = base_permissions
+    parent_id = str(channel.get("parent_id") or "").strip()
+    parent = channel_by_id.get(parent_id) if parent_id else None
+    channel_overwrites = channel.get("permission_overwrites")
+    parent_overwrites = parent.get("permission_overwrites") if isinstance(parent, dict) else None
+
+    # Child channels that do not carry their own overwrites inherit category visibility.
+    overwrites = channel_overwrites if channel_overwrites else parent_overwrites
+    if isinstance(overwrites, list):
+        permissions = _apply_permission_overwrites(
+            permissions=permissions,
+            overwrites=overwrites,
+            guild_id=guild_id,
+            user_id=user_id,
+            member_role_ids=member_role_ids,
+        )
+
+    return permissions
+
+
+def _apply_permission_overwrites(
+    permissions: int,
+    overwrites: list,
+    guild_id: str,
+    user_id: str,
+    member_role_ids: set[str],
+) -> int:
+    everyone_overwrite = _find_overwrite(overwrites, guild_id)
+    if everyone_overwrite:
+        permissions = _apply_single_overwrite(permissions, everyone_overwrite)
+
+    role_allow = 0
+    role_deny = 0
+    for overwrite in overwrites:
+        if not isinstance(overwrite, dict):
+            continue
+        overwrite_id = str(overwrite.get("id") or "")
+        if overwrite_id in member_role_ids:
+            role_allow |= _parse_permission_value(overwrite.get("allow"))
+            role_deny |= _parse_permission_value(overwrite.get("deny"))
+    permissions &= ~role_deny
+    permissions |= role_allow
+
+    member_overwrite = _find_overwrite(overwrites, user_id)
+    if member_overwrite:
+        permissions = _apply_single_overwrite(permissions, member_overwrite)
+
+    return permissions
+
+
+def _apply_single_overwrite(permissions: int, overwrite: dict) -> int:
+    deny = _parse_permission_value(overwrite.get("deny"))
+    allow = _parse_permission_value(overwrite.get("allow"))
+    permissions &= ~deny
+    permissions |= allow
+    return permissions
+
+
+def _find_overwrite(overwrites: list, overwrite_id: str) -> dict | None:
+    for overwrite in overwrites:
+        if isinstance(overwrite, dict) and str(overwrite.get("id") or "") == overwrite_id:
+            return overwrite
+    return None
+
+
+def _parse_permission_value(value) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _discord_api_request(discord_token: str, path: str):
