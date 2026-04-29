@@ -22,6 +22,7 @@ const today = new Date().toISOString().slice(0, 10);
 const weekAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const CATEGORY_CHANNEL_TYPE = 4;
 const EXPORTABLE_CHANNEL_TYPES = new Set([0, 2, 5, 10, 11, 12, 13, 15, 16]);
+const UNCATEGORIZED_CHANNEL_GROUP_ID = "__uncategorized";
 
 type ChannelGroup = {
   id: string;
@@ -40,10 +41,24 @@ function getChannelPrefix(channel: DiscordChannel): string {
   return "#";
 }
 
-function getCategoryIds(items: DiscordChannel[]): string[] {
-  return items
-    .filter((item) => item.type === CATEGORY_CHANNEL_TYPE)
-    .map((item) => item.id);
+function getInitialCollapsedChannelGroupIds(items: DiscordChannel[]): string[] {
+  const categoryIds = new Set(
+    items.filter((item) => item.type === CATEGORY_CHANNEL_TYPE).map((item) => item.id)
+  );
+  const collapsedIds = new Set<string>();
+
+  for (const item of items) {
+    if (item.type === CATEGORY_CHANNEL_TYPE) continue;
+    if (item.type !== null && !EXPORTABLE_CHANNEL_TYPES.has(item.type)) continue;
+
+    if (item.parent_id && categoryIds.has(item.parent_id)) {
+      collapsedIds.add(item.parent_id);
+    } else {
+      collapsedIds.add(UNCATEGORIZED_CHANNEL_GROUP_ID);
+    }
+  }
+
+  return [...collapsedIds];
 }
 
 export default function ScrapeForm({ locale, onSuccess }: ScrapeFormProps) {
@@ -157,7 +172,7 @@ export default function ScrapeForm({ locale, onSuccess }: ScrapeFormProps) {
       }));
     const categoryMap = new Map(categories.map((item) => [item.id, item]));
     const uncategorized: ChannelGroup = {
-      id: "__uncategorized",
+      id: UNCATEGORIZED_CHANNEL_GROUP_ID,
       name: t(locale, "scrape.channel.uncategorized"),
       position: -1,
       channels: []
@@ -299,7 +314,7 @@ export default function ScrapeForm({ locale, onSuccess }: ScrapeFormProps) {
       if (requestId !== channelRequestRef.current) return;
       setChannels(items);
       setSelectedChannelIds([]);
-      setCollapsedCategoryIds(getCategoryIds(items));
+      setCollapsedCategoryIds(getInitialCollapsedChannelGroupIds(items));
     } catch (error) {
       if (requestId !== channelRequestRef.current) return;
       setChannels([]);
