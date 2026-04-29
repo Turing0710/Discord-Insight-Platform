@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: discord-insight-backend
+    runtime: docker
+    plan: starter
+    dockerContext: .
+    dockerfilePath: ./deploy/backend.Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: EXPORT_TIMEOUT_SECONDS
+        value: "1800"
+
+  - type: web
+    name: discord-insight-frontend
+    runtime: docker
+    plan: starter
+    dockerContext: .
+    dockerfilePath: ./deploy/frontend.Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://discord-insight-backend.onrender.com

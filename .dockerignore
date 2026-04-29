@@ -1,0 +1,37 @@
+﻿.git
+.gitignore
+.gitattributes
+**/.DS_Store
+**/Thumbs.db
+
+# Python
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+backend/.venv
+backend/venv
+
+# Node / Next
+**/node_modules
+frontend/.next
+frontend/out
+frontend/dist
+frontend/tsconfig.tsbuildinfo
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+deploy/.env.prod
+
+# Runtime data
+**/*.log
+backend/tmp_*.json
+backend/exports/**
+!backend/exports/.gitkeep
+
+# Local DiscordChatExporter binaries are not required for Docker build.
+backend/tools/DiscordChatExporter.Cli/**
+!backend/tools/DiscordChatExporter.Cli/README.md

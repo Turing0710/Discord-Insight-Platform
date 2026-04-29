@@ -1,0 +1,58 @@
+﻿# Secrets and local env
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+deploy/.env.prod
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/.venv/
+backend/venv/
+
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+dist/
+coverage/
+frontend/tsconfig.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime logs
+*.log
+backend/*.log
+frontend/*.log
+deploy/*.log
+backend/tmp_*.json
+
+# Exported Discord data
+backend/exports/**
+!backend/exports/.gitkeep
+
+# DiscordChatExporter local binaries. Keep only the placeholder README.
+backend/tools/DiscordChatExporter.Cli/**
+!backend/tools/DiscordChatExporter.Cli/
+!backend/tools/DiscordChatExporter.Cli/README.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local tunnel / deployment noise
+.cloudflared/
