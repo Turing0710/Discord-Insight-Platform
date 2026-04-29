@@ -40,6 +40,12 @@ function getChannelPrefix(channel: DiscordChannel): string {
   return "#";
 }
 
+function getCategoryIds(items: DiscordChannel[]): string[] {
+  return items
+    .filter((item) => item.type === CATEGORY_CHANNEL_TYPE)
+    .map((item) => item.id);
+}
+
 export default function ScrapeForm({ locale, onSuccess }: ScrapeFormProps) {
   const [discordToken, setDiscordToken] = useState("");
   const [guilds, setGuilds] = useState<DiscordGuild[]>([]);
@@ -293,7 +299,7 @@ export default function ScrapeForm({ locale, onSuccess }: ScrapeFormProps) {
       if (requestId !== channelRequestRef.current) return;
       setChannels(items);
       setSelectedChannelIds([]);
-      setCollapsedCategoryIds([]);
+      setCollapsedCategoryIds(getCategoryIds(items));
     } catch (error) {
       if (requestId !== channelRequestRef.current) return;
       setChannels([]);
