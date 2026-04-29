@@ -527,7 +527,21 @@ export default function ScrapeForm({ locale, onSuccess }: ScrapeFormProps) {
           </label>
 
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-700">{t(locale, "scrape.label.server")}</span>
+            <span className="flex min-h-6 items-center justify-between gap-3 text-sm font-medium text-slate-700">
+              <span>{t(locale, "scrape.label.server")}</span>
+              {browserStatus ? (
+                <span
+                  className={`max-w-[62%] truncate rounded-full border px-2.5 py-1 text-[11px] font-normal leading-none ${
+                    browserError
+                      ? "border-rose-200 bg-rose-50 text-rose-700"
+                      : "border-slate-200 bg-slate-50 text-slate-500"
+                  }`}
+                  title={browserStatus}
+                >
+                  {browserStatus}
+                </span>
+              ) : null}
+            </span>
             <input
               value={guildSearch}
               onChange={(e) => setGuildSearch(e.target.value)}
@@ -737,18 +751,6 @@ export default function ScrapeForm({ locale, onSuccess }: ScrapeFormProps) {
             <p className="text-xs text-slate-500">{t(locale, "scrape.helper.subOptionIdManual")}</p>
           </label>
         </div>
-
-        {browserStatus ? (
-          <div
-            className={`rounded-xl border px-4 py-3 text-xs ${
-              browserError
-                ? "border-rose-300 bg-rose-50 text-rose-700"
-                : "border-slate-200 bg-slate-50 text-slate-600"
-            }`}
-          >
-            {browserStatus}
-          </div>
-        ) : null}
 
         <div className="grid gap-4 md:grid-cols-3">
           <label className="space-y-2">
