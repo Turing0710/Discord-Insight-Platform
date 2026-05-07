@@ -29,7 +29,7 @@ if (Test-Path $logErr) { try { Remove-Item $logErr -Force } catch {} }
 powershell -NoProfile -ExecutionPolicy Bypass -File $stableStart | Out-Null
 
 Start-Process -FilePath $cloudflared `
-  -ArgumentList @("tunnel", "--url", "http://127.0.0.1:3000", "--no-autoupdate") `
+  -ArgumentList @("tunnel", "--protocol", "http2", "--url", "http://127.0.0.1:3000", "--no-autoupdate") `
   -RedirectStandardOutput $logOut `
   -RedirectStandardError $logErr `
   -PassThru | Out-Null

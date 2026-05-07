@@ -4,6 +4,56 @@ Discord Insight Platform is a local-first web dashboard for collecting Discord c
 
 It is built for internal community, product, support, growth, and game operation workflows.
 
+## Quick Start For Windows Users
+
+This is the easiest path for non-developers.
+
+1. Install prerequisites:
+   - Python 3.12+
+   - Node.js 20+
+   - npm, included with Node.js
+   - .NET Runtime, only needed if your DiscordChatExporter build requires it
+2. Download this repository from GitHub, or run:
+
+```powershell
+git clone https://github.com/Turing0710/Discord-Insight-Platform.git
+cd Discord-Insight-Platform
+```
+
+3. Double-click:
+
+```text
+Start-Discord-Insight-Platform.bat
+```
+
+The first run will:
+
+- Create `backend/.env`
+- Create `frontend/.env.local`
+- Install Python dependencies
+- Install frontend npm dependencies
+- Download DiscordChatExporter.Cli into `backend/tools/DiscordChatExporter.Cli`
+- Start the backend and frontend
+- Open `http://127.0.0.1:3000`
+
+After the first run, users can usually just double-click the same `.bat` file again.
+
+## Quick Start For macOS / Linux Users
+
+```bash
+git clone https://github.com/Turing0710/Discord-Insight-Platform.git
+cd Discord-Insight-Platform
+chmod +x scripts/setup.sh scripts/start-dev.sh
+./scripts/setup.sh
+./scripts/start-dev.sh
+```
+
+Open:
+
+```text
+http://127.0.0.1:3000
+```
+
 ## Features
 
 - Phase 1 Scraping
@@ -84,6 +134,7 @@ discord-insight-platform/
 |   |-- start-dev.ps1
 |   |-- setup.sh
 |   `-- start-dev.sh
+|-- Start-Discord-Insight-Platform.bat
 |-- docker-compose.prod.yml
 |-- render.yaml
 |-- LICENSE
@@ -98,7 +149,7 @@ For local development:
 - Node.js 20+
 - npm
 - .NET Runtime if you use a `.dll` DiscordChatExporter build
-- DiscordChatExporter.Cli runtime files for your operating system
+- DiscordChatExporter.Cli runtime files for your operating system. The setup scripts try to download these automatically.
 
 For Docker production:
 
@@ -111,21 +162,19 @@ The backend Docker image downloads the Linux x64 DiscordChatExporter.Cli automat
 
 From the repository root:
 
+For most Windows users, use the one-click launcher:
+
+```text
+Start-Discord-Insight-Platform.bat
+```
+
+For manual setup:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ```
 
-Then put DiscordChatExporter.Cli files into:
-
-```text
-backend/tools/DiscordChatExporter.Cli/
-```
-
-Download DiscordChatExporter releases from:
-
-```text
-https://github.com/Tyrrrz/DiscordChatExporter/releases
-```
+The setup script automatically downloads DiscordChatExporter.Cli when possible. If the download fails, manually place the runtime files into `backend/tools/DiscordChatExporter.Cli/`.
 
 Start the app:
 
@@ -152,11 +201,7 @@ chmod +x scripts/setup.sh scripts/start-dev.sh
 ./scripts/setup.sh
 ```
 
-Put DiscordChatExporter.Cli files into:
-
-```text
-backend/tools/DiscordChatExporter.Cli/
-```
+The setup script automatically downloads DiscordChatExporter.Cli when possible. If the download fails, manually place the runtime files into `backend/tools/DiscordChatExporter.Cli/`.
 
 Start the app:
 
